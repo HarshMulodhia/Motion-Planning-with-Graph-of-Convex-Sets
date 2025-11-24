@@ -1,1 +1,1 @@
-# Motion-Planning-with-Graph-of-Convex-Sets-GCS-
+# Motion-Planning-with-Graph-of-Convex-Sets

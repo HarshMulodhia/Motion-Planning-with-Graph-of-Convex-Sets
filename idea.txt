@@ -1,0 +1,3 @@
+Split the free space(other than obstacles) into a union of overlapping convex sets. 
+Mixed-Integer Convex Program (MICP): search to find the best sequence of convex sets 
+and the optimal path within them(simultaneously), to reach from start to goal state.
