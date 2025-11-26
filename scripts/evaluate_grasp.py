@@ -1,7 +1,7 @@
 # scripts/evaluate_grasp.py
 import numpy as np
 from stable_baselines3 import PPO
-from src.ycb_grasp_rl_env import YCBGraspEnv
+from ycb_grasp_rl_env import YCBGraspEnv
 import json
 
 # Load trained model and config

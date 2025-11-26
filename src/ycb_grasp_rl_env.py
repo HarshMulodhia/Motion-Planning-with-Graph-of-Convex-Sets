@@ -3,8 +3,10 @@ import gymnasium as gym
 import numpy as np
 import pybullet as p
 from typing import Tuple, Dict
-from src.gcs_decomposer import GCSDecomposer
-from src.gripper_config import ConfigurationSpaceSampler
+from gcs_decomposer import GCSDecomposer
+from gripper_config import ConfigurationSpaceSampler
+from typing import List
+
 
 class YCBGraspEnv(gym.Env):
     """

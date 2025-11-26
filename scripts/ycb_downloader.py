@@ -8,6 +8,8 @@ import sys
 import json
 import urllib.request
 import urllib.error
+from typing import List
+
 
 # FIX #3: Use home directory expansion
 output_directory = os.path.expanduser("datasets/ycb_data/ycb_models")

@@ -1,90 +1,169 @@
-# src/gripper_config.py
+"""
+6D Gripper Configuration Space
+
+Manages position (x, y, z) and orientation (roll, pitch, yaw) for gripper manipulator.
+"""
+
 import numpy as np
+import pybullet as p
+from typing import Tuple, List, Optional
 from dataclasses import dataclass
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
-class GripperConfig:
-    """6D gripper configuration: 3D position + 3D rotation"""
-    x: float  # End-effector X position
-    y: float  # End-effector Y position
-    z: float  # End-effector Z position
-    roll: float   # Rotation around X-axis
-    pitch: float  # Rotation around Y-axis
-    yaw: float    # Rotation around Z-axis
-    
-    def to_array(self) -> np.ndarray:
-        return np.array([self.x, self.y, self.z, self.roll, self.pitch, self.yaw])
-    
-    @staticmethod
-    def from_array(arr: np.ndarray) -> 'GripperConfig':
-        return GripperConfig(*arr)
+class ConfigSpace:
+    """6D configuration space bounds for gripper."""
 
-class ConfigurationSpaceSampler:
-    """Sample collision-free 6D gripper configurations"""
-    
-    def __init__(self, workspace_bounds: dict, object_id: int, physics_client: int):
+    x_range: Tuple[float, float] = (-1.0, 1.0)
+    y_range: Tuple[float, float] = (-1.0, 1.0)
+    z_range: Tuple[float, float] = (0.0, 1.5)
+    roll_range: Tuple[float, float] = (-np.pi, np.pi)
+    pitch_range: Tuple[float, float] = (-np.pi / 2, np.pi / 2)
+    yaw_range: Tuple[float, float] = (-np.pi, np.pi)
+
+    def get_bounds(self) -> np.ndarray:
+        """Get configuration space bounds as (6, 2) array."""
+        return np.array([
+            self.x_range,
+            self.y_range,
+            self.z_range,
+            self.roll_range,
+            self.pitch_range,
+            self.yaw_range
+        ])
+
+
+class GripperConfiguration:
+    """Manages 6D gripper configuration and collision detection."""
+
+    def __init__(self, gripper_urdf_path: str):
         """
+        Initialize gripper configuration.
+
         Args:
-            workspace_bounds: {'x': (min, max), 'y': (min, max), 'z': (min, max)}
-            object_id: PyBullet object ID
-            physics_client: PyBullet client ID
+            gripper_urdf_path: Path to gripper URDF file
+
+        Raises:
+            FileNotFoundError: If URDF file not found
         """
-        self.workspace_bounds = workspace_bounds
-        self.object_id = object_id
-        self.physics_client = physics_client
-        self.collision_shape_id = None
-        
-    def sample_random_config(self) -> GripperConfig:
-        """Sample random 6D configuration"""
-        x = np.random.uniform(*self.workspace_bounds['x'])
-        y = np.random.uniform(*self.workspace_bounds['y'])
-        z = np.random.uniform(*self.workspace_bounds['z'])
-        
-        # Sample random orientations (Euler angles)
-        roll = np.random.uniform(0, 2*np.pi)
-        pitch = np.random.uniform(0, np.pi)
-        yaw = np.random.uniform(0, 2*np.pi)
-        
-        return GripperConfig(x, y, z, roll, pitch, yaw)
-    
-    def is_collision_free(self, config: GripperConfig, gripper_id: int) -> bool:
-        """Check if configuration is collision-free using PyBullet"""
-        import pybullet as p
-        
-        # Move gripper to configuration
-        p.resetBasePositionAndOrientation(
-            gripper_id,
-            [config.x, config.y, config.z],
-            p.getQuaternionFromEuler([config.roll, config.pitch, config.yaw]),
-            physicsClientId=self.physics_client
-        )
-        
-        # Check collision with object
-        contact_points = p.getContactPoints(
-            bodyA=gripper_id,
-            bodyB=self.object_id,
-            physicsClientId=self.physics_client
-        )
-        
-        # Collision-free if no contact points
-        return len(contact_points) == 0
-    
-    def sample_free_configurations(self, num_samples: int = 5000, 
-                                   gripper_id: int = None) -> np.ndarray:
-        """Sample collision-free configurations"""
-        free_configs = []
-        attempts = 0
-        max_attempts = num_samples * 50  # Allow many failed attempts
-        
-        while len(free_configs) < num_samples and attempts < max_attempts:
-            config = self.sample_random_config()
-            
-            if self.is_collision_free(config, gripper_id):
-                free_configs.append(config.to_array())
-            
-            attempts += 1
-        
-        print(f"Sampled {len(free_configs)}/{num_samples} collision-free configs")
-        print(f"Success rate: {100*len(free_configs)/attempts:.1f}%")
-        
-        return np.array(free_configs)
+        import os
+        if not os.path.exists(gripper_urdf_path):
+            raise FileNotFoundError(f"Gripper URDF not found: {gripper_urdf_path}")
+
+        self.gripper_urdf = gripper_urdf_path
+        self.config_space = ConfigSpace()
+        logger.info(f"[Gripper] Initialized with URDF: {gripper_urdf_path}")
+
+    def sample_random_config(self) -> np.ndarray:
+        """
+        Sample random configuration within bounds.
+
+        Returns:
+            6D configuration vector [x, y, z, roll, pitch, yaw]
+        """
+        bounds = self.config_space.get_bounds()
+        config = np.array([
+            np.random.uniform(bounds[0, 0], bounds[0, 1]),
+            np.random.uniform(bounds[1, 0], bounds[1, 1]),
+            np.random.uniform(bounds[2, 0], bounds[2, 1]),
+            np.random.uniform(bounds[3, 0], bounds[3, 1]),
+            np.random.uniform(bounds[4, 0], bounds[4, 1]),
+            np.random.uniform(bounds[5, 0], bounds[5, 1]),
+        ])
+        return config
+
+    def sample_multiple_configs(self, num_samples: int) -> np.ndarray:
+        """
+        Sample multiple configurations.
+
+        Args:
+            num_samples: Number of samples to generate
+
+        Returns:
+            (num_samples, 6) array of configurations
+        """
+        configs = np.array([self.sample_random_config() for _ in range(num_samples)])
+        logger.info(f"[Gripper] Sampled {num_samples} configurations")
+        return configs
+
+    def is_collision_free(self, config: np.ndarray, gripper_id: int,
+                         scene_objects: List[int], verbose: bool = False) -> bool:
+        """
+        Check if configuration is collision-free using PyBullet.
+
+        Args:
+            config: 6D configuration [x, y, z, roll, pitch, yaw]
+            gripper_id: PyBullet body ID of gripper
+            scene_objects: List of PyBullet body IDs to check collision against
+            verbose: Print collision info
+
+        Returns:
+            True if collision-free
+        """
+        # Update gripper position
+        pos = config[:3]
+        quat = p.getQuaternionFromEuler(config[3:])
+        p.resetBasePositionAndOrientation(gripper_id, pos, quat)
+
+        # Check collisions
+        for obj_id in scene_objects:
+            contact_points = p.getContactPoints(gripper_id, obj_id)
+            if contact_points:
+                if verbose:
+                    logger.debug(f"Collision detected between gripper and object {obj_id}")
+                return False
+
+        return True
+
+    def config_to_pose(self, config: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Convert 6D config to position and quaternion.
+
+        Args:
+            config: 6D configuration [x, y, z, roll, pitch, yaw]
+
+        Returns:
+            Tuple of (position [3], quaternion [4])
+        """
+        pos = config[:3]
+        quat = p.getQuaternionFromEuler(config[3:])
+        return pos, quat
+
+    def pose_to_config(self, pos: np.ndarray, quat: np.ndarray) -> np.ndarray:
+        """
+        Convert position and quaternion to 6D config.
+
+        Args:
+            pos: Position [x, y, z]
+            quat: Quaternion [x, y, z, w]
+
+        Returns:
+            6D configuration
+        """
+        euler = p.getEulerFromQuaternion(quat)
+        config = np.concatenate([pos, euler])
+        return config
+
+    def is_within_bounds(self, config: np.ndarray) -> bool:
+        """
+        Check if configuration is within configuration space bounds.
+
+        Args:
+            config: 6D configuration
+
+        Returns:
+            True if within bounds
+        """
+        bounds = self.config_space.get_bounds()
+        for i, (lower, upper) in enumerate(bounds):
+            if config[i] < lower or config[i] > upper:
+                return False
+        return True
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    print("Gripper Configuration module loaded successfully")
