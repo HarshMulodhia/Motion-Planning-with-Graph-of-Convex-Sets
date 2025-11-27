@@ -44,14 +44,10 @@ class GCSDecomposer:
         logger.info(f"[GCS] Initialized with {len(free_configs)} configs, target {num_regions} regions")
 
     def decompose(self) -> List[Dict]:
-        """
-        Decompose C-space using K-means clustering + convex hulls.
-
-        Returns:
-            List of region dictionaries with polytope data
-        """
+        """Decompose C-space using K-means clustering + convex hulls."""
+        
         logger.info(f"[GCS] Clustering {len(self.free_configs)} configs into {self.num_regions} regions...")
-
+        
         # Cluster using K-means
         self.kmeans = KMeans(
             n_clusters=self.num_regions,
@@ -59,19 +55,27 @@ class GCSDecomposer:
             n_init=10,
             max_iter=300
         )
+        
         self.region_labels = self.kmeans.fit_predict(self.free_configs)
-
+        
         # Create polytope for each region
         valid_regions = 0
+        
         for region_id in range(self.num_regions):
             cluster_samples = self.free_configs[self.region_labels == region_id]
-
-            if len(cluster_samples) < 4:
-                logger.warning(f"  Region {region_id}: insufficient samples ({len(cluster_samples)} < 4)")
+            
+            # FIX 1: Require minimum samples for 6D ConvexHull
+            # In N-D space, need N+1 points. For 6D, need 7. Use 9 for safety.
+            min_samples_needed = self.free_configs.shape[1] + 2  # N + 2
+            
+            if len(cluster_samples) < min_samples_needed:
+                #logger.warning(f" Region {region_id}: insufficient samples ({len(cluster_samples)} < {min_samples_needed})")
                 continue
-
+            
             try:
-                hull = ConvexHull(cluster_samples)
+                # FIX 2: Add QJ option to handle degenerate/coplanar points
+                hull = ConvexHull(cluster_samples, qhull_options='QJ')
+                
                 region = {
                     'id': region_id,
                     'centroid': cluster_samples.mean(axis=0),
@@ -81,24 +85,29 @@ class GCSDecomposer:
                     'num_samples': len(cluster_samples),
                     'volume': hull.volume
                 }
+                
                 self.regions.append(region)
                 valid_regions += 1
+                
             except Exception as e:
-                logger.error(f"  Region {region_id}: ConvexHull failed - {e}")
-
+                logger.error(f" Region {region_id}: ConvexHull failed - {e}")
+                # Skip invalid region, continue
+                continue
+        
         logger.info(f"[GCS] Created {len(self.regions)} valid regions ({valid_regions}/{self.num_regions})")
+        
         return self.regions
+
 
     def get_region_for_config(self, config):
         """
         Find the region that contains or is nearest to the given configuration.
-        
         Args:
-            config: Configuration array (6D)
-        
+        config: Configuration array (6D)
         Returns:
-            Region ID (integer)
+        Region ID (integer)
         """
+        
         if not hasattr(self, 'regions') or not self.regions:
             return 0
         
@@ -110,7 +119,7 @@ class GCSDecomposer:
             iterator = self.regions.items()
         else:
             iterator = enumerate(self.regions)
-            
+        
         for i, region_points in iterator:
             # FIXED: Robustly handle scalar/empty data
             points_array = np.asarray(region_points)
@@ -118,7 +127,7 @@ class GCSDecomposer:
             # Skip empty or invalid regions
             if points_array.ndim == 0 or points_array.size == 0:
                 continue
-                
+            
             # Calculate centroid safely
             centroid = np.mean(points_array, axis=0)
             
@@ -131,6 +140,7 @@ class GCSDecomposer:
                 best_region = i
         
         return best_region
+
 
     
     def are_adjacent(self, region1, region2, *args, **kwargs):
