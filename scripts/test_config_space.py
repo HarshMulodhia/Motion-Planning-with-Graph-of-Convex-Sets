@@ -16,8 +16,7 @@ import numpy as np
 try:
     import pybullet as p
     import pybullet_data
-    # UPDATED IMPORT:
-    from src.gripper_config import GripperConfiguration
+    from src.gripper_config import GripperConfig
     from src.create_gripper import create_gripper_urdf
     PYBULLET_AVAILABLE = True
 except ImportError as e:
@@ -46,7 +45,7 @@ def test_config_space():
 
     # Test Config Class
     try:
-        gripper_config = GripperConfiguration(gripper_urdf_path)
+        gripper_config = GripperConfig(gripper_urdf_path)
         config = gripper_config.sample_random_config()
         logger.info(f"Sampled config: {config}")
         logger.info("✓ Configuration space initialized successfully")

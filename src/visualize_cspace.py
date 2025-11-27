@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from gripper_config import ConfigurationSpaceSampler, GripperConfig
+from src.gripper_config import ConfigSpace, GripperConfig
 import pybullet as p
 import pybullet_data
 
@@ -28,7 +28,7 @@ workspace = {
 }
 
 # Sample free configurations
-sampler = ConfigurationSpaceSampler(workspace, ycb_obj, p.getPhysicsEngineClient())
+sampler = ConfigSpace(workspace, ycb_obj, p.getPhysicsEngineClient())
 free_configs = sampler.sample_free_configurations(num_samples=3000, gripper_id=gripper)
 
 # Visualize in 3D (positions only)

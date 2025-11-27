@@ -14,12 +14,13 @@ import numpy as np
 from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
 logger = logging.getLogger(__name__)
 
 # Try to import custom environment - will fail gracefully if not available
 try:
-    from ycb_grasp_rl_env import YCBGraspEnv
+    from src.ycb_grasp_rl_env import YCBGraspEnv
     YCB_ENV_AVAILABLE = True
 except ImportError:
     logger.warning("YCBGraspEnv not available - using mock for testing")
@@ -29,16 +30,13 @@ except ImportError:
 # Configuration
 CONFIG = {
     'ycb_objects': [
-        "002_master_chef_can", "003_cracker_box", "004_sugar_box", "005_tomato_soup_can",
-        "006_mustard_bottle", "007_tuna_fish_can", "008_pudding_box", "009_gelatin_box",
-        "010_potted_meat_can", "017_orange", "019_pitcher_base", "021_bleach_cleanser",
-        "024_bowl", "026_sponge", "032_knife", "033_spatula", "035_power_drill",
-        "036_wood_block", "037_scissors", "038_padlock", "076_timer", "077_rubiks_cube"
+        "rubiks_cube", "racquetball", "hammer", "plate", "windex_bottle", 
+        "spoon", "sponge", "scissors", "mug", "power_drill", 
     ],
     'num_regions': 50,
     'max_steps': 100,
     'num_envs': 4,
-    'total_timesteps': 1_000_000,
+    'total_timesteps': 1_000,
     'learning_rate': 3e-4,
     'algorithm': 'PPO',  # or 'SAC'
 }
@@ -62,7 +60,7 @@ def make_env(env_id: int):
             ycb_objects=CONFIG['ycb_objects'],
             num_regions=CONFIG['num_regions'],
             max_steps=CONFIG['max_steps'],
-            render=(env_id == 0)  # Render only first env
+            render=False  # Render only first env
         )
         return env
 
@@ -94,11 +92,7 @@ def train_model():
     # Create vectorized environments
     logger.info("[Training] Creating vectorized environments...")
     try:
-        env = make_vec_env(
-            make_env(0),
-            n_envs=CONFIG['num_envs'],
-            start_method='fork'  # Use fork for Unix/Linux
-        )
+        env = make_vec_env(make_env(0), n_envs=CONFIG['num_envs'])
         logger.info(f"✓ Created {CONFIG['num_envs']} parallel environments")
     except Exception as e:
         logger.error(f"Failed to create environments: {e}")
@@ -159,7 +153,8 @@ def train_model():
     try:
         model.learn(
             total_timesteps=CONFIG['total_timesteps'],
-            callback=[checkpoint_callback, eval_callback],
+            #callback=[checkpoint_callback, eval_callback],
+            callback=[checkpoint_callback],
             progress_bar=True
         )
         logger.info("✓ Training completed successfully")

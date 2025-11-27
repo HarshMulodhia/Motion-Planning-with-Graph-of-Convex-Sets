@@ -36,7 +36,7 @@ class ConfigSpace:
         ])
 
 
-class GripperConfiguration:
+class GripperConfig:
     """Manages 6D gripper configuration and collision detection."""
 
     def __init__(self, gripper_urdf_path: str):

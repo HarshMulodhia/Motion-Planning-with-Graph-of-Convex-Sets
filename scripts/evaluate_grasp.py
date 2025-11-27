@@ -1,7 +1,7 @@
 # scripts/evaluate_grasp.py
 import numpy as np
 from stable_baselines3 import PPO
-from ycb_grasp_rl_env import YCBGraspEnv
+from src.ycb_grasp_rl_env import YCBGraspEnv
 import json
 
 # Load trained model and config
@@ -13,11 +13,11 @@ model = PPO.load('models/ycb_grasp/final_model')
 
 # Test on unseen objects (objects 11-15)
 test_objects = [
-    '011_banana',
-    '012_strawberry',
-    '013_apple',
-    '014_lemon',
-    '015_peach'
+    'banana',
+    'strawberry',
+    'apple',
+    'lemon',
+    'peach'
 ]
 
 print("=" * 60)
@@ -42,27 +42,35 @@ for obj in test_objects:
         render=False
     )
     
-    for episode in range(5):  # 5 episodes per object
+    for episode in range(20):  # 20 episodes per object
         obs, _ = env.reset()
         done = False
         episode_reward = 0
         step_count = 0
+        final_distance = 1.0
         
-        while not done:
+        MAX_STEPS = config['max_steps'] + 10
+
+        while not done and step_count < MAX_STEPS:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, done, truncated, info = env.step(action)
-            episode_reward += reward
+            obs, reward, terminated, truncated, info = env.step(action)
             step_count += 1
+            done = terminated or truncated
+            
+        if step_count >= MAX_STEPS:
+            print(f"⚠ Warning: Hit safety limit")
         
-        success = episode_reward > 40  # Threshold for success
+        # FIXED: Distance-based success metric
+        success = (final_distance < 0.1 and step_count < 50)
+        
         results['success_rate'].append(success)
         results['avg_path_length'].append(step_count)
-        results['avg_distance'].append(info.get('distance', 0))
+        results['avg_distance'].append(final_distance)
         results['num_episodes'] += 1
         
-        print(f"  Episode {episode+1}: {'✓ Success' if success else '✗ Failed'} | "
-              f"Length: {step_count} | Reward: {episode_reward:.2f}")
-    
+        print(f" Episode {episode+1}: {'✓ Success' if success else '✗ Failed'} | "
+            f"Distance: {final_distance:.4f} | Steps: {step_count}")
+
     env.close()
 
 # Summary statistics

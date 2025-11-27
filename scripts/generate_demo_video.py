@@ -255,41 +255,42 @@ class DemoVisualizer:
         ax.scatter(*obj_pos, color='red', s=150, marker='o',
                   label='Target Object', edgecolors='darkred', linewidth=2)
 
-        # Labels
+            # Labels and title
         ax.set_xlabel('X (m)', fontsize=12, fontweight='bold')
         ax.set_ylabel('Y (m)', fontsize=12, fontweight='bold')
         ax.set_zlabel('Z (m)', fontsize=12, fontweight='bold')
-
+        
         progress = int((frame_num / self.total_frames) * 100)
         ax.set_title(
             f'GCS-Guided Deep RL for Manipulation\nPlanning Progress: {progress}%',
             fontsize=16, fontweight='bold', pad=20
         )
-
+        
         ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
-
-        # Info text
+        
+        # Info text box
         info_text = (
             f"Regions: {len(regions)} | "
             f"Active: {selected_region_id + 1}/{len(regions)} | "
             f"Frame: {frame_num}/{self.total_frames}"
         )
         ax.text2D(0.02, 0.02, info_text, transform=ax.transAxes,
-                 fontsize=10, verticalalignment='bottom',
-                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-
-        # Camera angle
+                fontsize=10, verticalalignment='bottom',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+        # Animated camera angle
         azim = 45 + (frame_num / self.total_frames) * 90
         elev = 30 + (frame_num / self.total_frames) * 20
         ax.view_init(elev=elev, azim=azim)
-
-        # Save
+        
+        # Save frame to file
         frame_path = os.path.join(self.output_dir, f'frame_{frame_num:04d}.png')
         plt.tight_layout()
         plt.savefig(frame_path, dpi=100, bbox_inches='tight')
         plt.close()
-
+        
         return frame_path
+
 
     def create_video_from_frames(self) -> bool:
         """Compile frames into MP4 video."""
